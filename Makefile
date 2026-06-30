@@ -1,3 +1,14 @@
+UV				= ~/.local/bin/uv
+V_PYTHON		= $(UV) run python
+V_PIP			= $(UV) pip
+MAIN			= src/__main__.py
+VENV			= .venv
+
+MYPY_FLAGS		= --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+DEPENDENCIES	= pytest flake8 mypy
+FLAKE			= $(V_PYTHON) -m flake8
+MYPY			= $(V_PYTHON) -m mypy
+
  .PHONY: install run debug clean lint lint-strict help
 
 help:
@@ -9,25 +20,35 @@ help:
 	@echo "  lint         - Run flake8 and mypy checks"
 	@echo "  lint-strict  - Run strict mypy checks"
 
-install:
-	python3 -m pip install -r requirements.txt
+all: run
 
-run:
-	python3 main.py map.txt
+$(VENV):
+	$(UV) venv
 
-debug:
-	python3 -m pdb main.py map.txt
+run: install
+	$(V_PYTHON) -m src
+
+install: $(VENV)
+	$(V_PIP) install torch --index-url https://download.pytorch.org/whl/cpu
+	$(V_PIP) install $(DEPENDENCIES)
+
+
+debug: install
+	$(V_PYTHON) -m pdb $(MAIN)
 
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type d -name ".mypy_cache" -exec rm -rf {} +
+	rm -rf .mypy_cache .pytest_cache
+	rm -rf $(VENV)
+	rm -rf uv.lock
+	rm -rf data/output/
 
-lint:
-	python3 -m flake8 .
-	python3 -m mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+lint: install
+	$(FLAKE) . --exclude '$(VENV)'
+	$(MYPY) $(MYPY_FLAGS) src
 
-lint-strict:
-	python3 -m flake8 .
-	python3 -m mypy . --strict
+lint-strict: install
+	$(FLAKE) . --exclude '$(VENV)'
+	$(MYPY) $(MYPY_FLAGS) --strict src
+ 
